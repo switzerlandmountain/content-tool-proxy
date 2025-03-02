@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Tool API Proxy</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+        .container {
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Content Tool API Proxy</h1>
+    <p>This is a GitHub Pages proxy for the Content Tool. It helps resolve CORS issues and provides a stable endpoint for API interactions.</p>
+    
+    <div class="container">
+        <h2>Available Endpoints</h2>
+        <ul>
+            <li><a href="./api/status/">Status Endpoint</a> - Check if the proxy is working</li>
+            <li><a href="./api/outline/">Outline Endpoint</a> - Generate content outlines</li>
+        </ul>
+    </div>
+    
+    <div class="container">
+        <h2>Configuration</h2>
+        <p>To use this proxy with your Content Tool, configure the webhook URL as:</p>
+        <code>https://[your-username].github.io/content-tool-proxy/api/outline</code>
+    </div>
+</body>
+</html>
