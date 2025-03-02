@@ -1,0 +1,46 @@
+name: Process Content Outline Request
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'The main topic for the outline'
+        required: true
+        type: string
+      keywords:
+        description: 'Keywords related to the topic'
+        required: false
+        type: string
+      sections:
+        description: 'Number of sections'
+        required: false
+        default: '5'
+        type: string
+
+jobs:
+  process-outline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          
+      - name: Install dependencies
+        run: npm install axios dotenv
+        
+      - name: Process outline request
+        run: node .github/scripts/process-outline.js
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TOPIC: ${{ github.event.inputs.topic }}
+          KEYWORDS: ${{ github.event.inputs.keywords }}
+          SECTIONS: ${{ github.event.inputs.sections }}
+
+      - name: Update response file
+        run: |
+          mkdir -p response
+          echo "Outline processed successfully" > response/result.txt
