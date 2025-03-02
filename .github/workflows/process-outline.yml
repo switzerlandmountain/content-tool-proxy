@@ -1,21 +1,8 @@
-name: Process Content Outline Request
+name: Process Outline Request
 
 on:
-  workflow_dispatch:
-    inputs:
-      topic:
-        description: 'The main topic for the outline'
-        required: true
-        type: string
-      keywords:
-        description: 'Keywords related to the topic'
-        required: false
-        type: string
-      sections:
-        description: 'Number of sections'
-        required: false
-        default: '5'
-        type: string
+  repository_dispatch:
+    types: [outline-request]
 
 jobs:
   process-outline:
@@ -23,24 +10,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
-          
+          node-version: '18'
+
       - name: Install dependencies
-        run: npm install axios dotenv
-        
+        run: npm install axios openai@3.3.0
+
       - name: Process outline request
-        run: node .github/scripts/process-outline.js
+        id: process
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          TOPIC: ${{ github.event.inputs.topic }}
-          KEYWORDS: ${{ github.event.inputs.keywords }}
-          SECTIONS: ${{ github.event.inputs.sections }}
-
-      - name: Update response file
+          REQUEST_DATA: ${{ toJson(github.event.client_payload) }}
         run: |
-          mkdir -p response
-          echo "Outline processed successfully" > response/result.txt
+          node .github/scripts/process-outline.js
+
+      - name: Return response
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          event-type: outline-response
+          client-payload: ${{ steps.process.outputs.response }}
