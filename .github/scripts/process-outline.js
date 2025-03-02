@@ -1,72 +1,164 @@
-// This script processes outline requests using OpenAI API
-const axios = require('axios');
-require('dotenv').config();
+const { Configuration, OpenAIApi } = require('openai');
+const fs = require('fs');
+const path = require('path');
 
-async function generateOutline() {
-  // Get input parameters from environment variables
-  const topic = process.env.TOPIC || 'Content Marketing';
-  const keywords = process.env.KEYWORDS || '';
-  const numSections = parseInt(process.env.SECTIONS || '5', 10);
+// Initialize OpenAI with API key from environment variables
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
+
+// Helper function to process WDF*IDF data
+function processWdfIdf(wdfIdf) {
+  if (!wdfIdf) return null;
   
-  // Log the received parameters
-  console.log(`Generating outline for topic: ${topic}`);
-  console.log(`Keywords: ${keywords}`);
-  console.log(`Number of sections: ${numSections}`);
+  // Extract top keywords based on TF*IDF
+  const topKeywords = wdfIdf.analysis.topTerms
+    .map(term => ({ 
+      term, 
+      weight: wdfIdf.terms.find(t => t.term === term)?.tfidf || 0 
+    }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5)
+    .map(k => k.term);
+    
+  // Create prompt context from WDF*IDF analysis
+  const promptContext = `
+    Important topics according to WDF*IDF analysis:
+    ${topKeywords.join(', ')}
+    
+    Underused terms that should be incorporated more:
+    ${wdfIdf.analysis.underusedTerms.join(', ')}
+    
+    Overused terms that should be reduced:
+    ${wdfIdf.analysis.overusedTerms.join(', ')}
+  `;
   
-  // Check if OpenAI API key is available
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    console.error('Error: OPENAI_API_KEY is not set. Please add this secret to your GitHub repository.');
-    process.exit(1);
-  }
-  
+  return {
+    promptContext,
+    enhancedKeywords: topKeywords
+  };
+}
+
+async function processOutlineRequest() {
   try {
-    // Prepare the prompt for OpenAI
-    const prompt = `Create a detailed content outline for an article about "${topic}".
-The outline should have ${numSections} main sections.
-${keywords ? `Include these keywords: ${keywords}` : ''}
-Format the response as a JSON object with title, description, and sections array.`;
+    // Parse request data from environment variable
+    const requestData = JSON.parse(process.env.REQUEST_DATA || '{}');
+    const { 
+      eventId, 
+      title, 
+      mainKeyword, 
+      secondaryKeywords, 
+      companyInfo, 
+      internalLinks, 
+      additionalContent,
+      wdfIdf 
+    } = requestData;
 
-    // Make a request to OpenAI API
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a content outline generator.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 1000
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    // Extract the generated outline from the response
-    const generatedOutline = response.data.choices[0].message.content;
-    
-    // Log success
-    console.log('Outline generated successfully:');
-    console.log(generatedOutline);
-    
-    // Here you would typically save the outline to a file or database
-    // For this example, we're just logging it to the console
-    
-  } catch (error) {
-    console.error('Error generating outline:');
-    if (error.response) {
-      console.error(error.response.data);
-    } else {
-      console.error(error.message);
+    // Validate required fields
+    if (!eventId || !title || !mainKeyword) {
+      console.error('Missing required fields');
+      process.exit(1);
     }
+
+    // Process WDF*IDF data if available
+    const wdfIdfData = wdfIdf ? processWdfIdf(wdfIdf) : null;
+    
+    // Prepare keywords for the prompt
+    const allKeywords = [
+      mainKeyword,
+      ...(secondaryKeywords || []),
+      ...(wdfIdfData?.enhancedKeywords || [])
+    ];
+    
+    // Create the system prompt
+    const systemPrompt = `You are an expert content strategist and SEO specialist. 
+    Your task is to create a detailed, SEO-optimized outline for an article.
+    Focus on creating a well-structured, comprehensive outline that covers the topic thoroughly.`;
+    
+    // Create the user prompt
+    const userPrompt = `Create a detailed SEO-optimized outline for: "${title}"
+    
+    Main Keyword: ${mainKeyword}
+    Secondary Keywords: ${allKeywords.join(', ')}
+    
+    Company Context: ${companyInfo || ''}
+    
+    ${wdfIdfData ? `WDF*IDF Analysis:\n${wdfIdfData.promptContext}` : ''}
+    
+    ${internalLinks ? `Internal Links to include:\n${internalLinks}` : ''}
+    
+    ${additionalContent ? `Additional Context:\n${additionalContent}` : ''}
+    
+    Please provide:
+    1. A comprehensive outline with H1, H2, and H3 headings
+    2. Brief descriptions of what each section should cover
+    3. SEO analysis with optimization suggestions
+    `;
+
+    // Call OpenAI API to generate the outline
+    const completion = await openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+
+    // Extract the generated outline
+    const generatedText = completion.data.choices[0]?.message?.content || "";
+    
+    // Split the response into outline and SEO analysis
+    const parts = generatedText.split(/#{1,3}\s*SEO Analysis/i);
+    const outline = parts[0].trim();
+    const seoAnalysis = parts.length > 1 ? `# SEO Analysis\n\n${parts[1].trim()}` : "";
+
+    // Prepare the response
+    const response = {
+      eventId,
+      status: "completed",
+      outline,
+      seoAnalysis,
+      metadata: {
+        processedKeywords: allKeywords,
+        aiConfidence: 0.85,
+        suggestions: seoAnalysis.split('\n').filter(line => line.trim().startsWith('-')).slice(0, 3),
+        timestamp: new Date().toISOString(),
+        version: "1.0",
+        wdfIdfAnalysis: wdfIdf ? {
+          score: wdfIdf.analysis.coverageStats.good / 
+                (wdfIdf.analysis.coverageStats.good + 
+                 wdfIdf.analysis.coverageStats.medium + 
+                 wdfIdf.analysis.coverageStats.poor),
+          recommendations: [
+            `Important underused terms: ${wdfIdf.analysis.underusedTerms.join(', ')}`,
+            `Potentially overused terms: ${wdfIdf.analysis.overusedTerms.join(', ')}`
+          ],
+          terms: wdfIdf.terms,
+          topTerms: wdfIdf.analysis.topTerms,
+          underusedTerms: wdfIdf.analysis.underusedTerms,
+          overusedTerms: wdfIdf.analysis.overusedTerms,
+          coverageStats: wdfIdf.analysis.coverageStats
+        } : null
+      }
+    };
+
+    // Save response to output for GitHub Actions
+    console.log(`::set-output name=response::${JSON.stringify(response)}`);
+    
+    // Also save to a JSON file as a backup
+    const responsePath = path.join(__dirname, '..', '..', 'api', 'responses', `${eventId}.json`);
+    fs.mkdirSync(path.dirname(responsePath), { recursive: true });
+    fs.writeFileSync(responsePath, JSON.stringify(response, null, 2));
+    
+    console.log('Outline processed successfully');
+  } catch (error) {
+    console.error('Error processing outline:', error);
     process.exit(1);
   }
 }
 
-// Run the outline generator
-generateOutline();
+// Run the function
+processOutlineRequest();
