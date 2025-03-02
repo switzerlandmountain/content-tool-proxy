@@ -1,49 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Content Tool API Proxy</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        h1 {
-            color: #2c3e50;
-        }
-        code {
-            background-color: #f8f9fa;
-            padding: 2px 4px;
-            border-radius: 4px;
-        }
-        .container {
-            border: 1px solid #e9ecef;
-            border-radius: 5px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content Tool API Proxy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #2563eb;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    .card {
+      background-color: #f9fafb;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    code {
+      background-color: #e5e7eb;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    pre {
+      background-color: #1f2937;
+      color: #f9fafb;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+    .endpoint {
+      font-weight: bold;
+      color: #2563eb;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .status.active {
+      background-color: #dcfce7;
+      color: #166534;
+    }
+    .status.inactive {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+  </style>
 </head>
 <body>
-    <h1>Content Tool API Proxy</h1>
-    <p>This is a GitHub Pages proxy for the Content Tool. It helps resolve CORS issues and provides a stable endpoint for API interactions.</p>
-    
-    <div class="container">
-        <h2>Available Endpoints</h2>
-        <ul>
-            <li><a href="./api/status/">Status Endpoint</a> - Check if the proxy is working</li>
-            <li><a href="./api/outline/">Outline Endpoint</a> - Generate content outlines</li>
-        </ul>
-    </div>
-    
-    <div class="container">
-        <h2>Configuration</h2>
-        <p>To use this proxy with your Content Tool, configure the webhook URL as:</p>
-        <code>https://[your-username].github.io/content-tool-proxy/api/outline</code>
-    </div>
+  <h1>Content Tool API Proxy</h1>
+  
+  <div class="card">
+    <h2>Status: <span class="status active">Active</span></h2>
+    <p>This is a static proxy for the Content Tool API. It helps bypass CORS restrictions when making requests from browser applications.</p>
+  </div>
+  
+  <div class="card">
+    <h2>Available Endpoints</h2>
+    <ul>
+      <li><span class="endpoint">/api/outline</span> - Generate content outlines</li>
+      <li><span class="endpoint">/api/status</span> - Check API status</li>
+    </ul>
+  </div>
+  
+  <div class="card">
+    <h2>How to Use</h2>
+    <p>Send a POST request to <code>/api/outline</code> with your outline request data:</p>
+    <pre><code>fetch('https://your-username.github.io/content-tool-proxy/api/outline', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    eventId: "evt_123456789",
+    title: "Cloud Security Best Practices",
+    mainKeyword: "cloud security",
+    secondaryKeywords: ["cybersecurity", "data protection"]
+  })
+})
+.then(response => response.json())
+.then(data => console.log(data));</code></pre>
+  </div>
+  
+  <div class="card">
+    <h2>How It Works</h2>
+    <p>This proxy uses GitHub Actions to process API requests. When you send a request to one of the endpoints:</p>
+    <ol>
+      <li>The request is forwarded to a GitHub Action workflow</li>
+      <li>The workflow processes your request using OpenAI's API</li>
+      <li>Results are returned to you without CORS issues</li>
+    </ol>
+    <p>All requests are processed securely and no data is stored permanently.</p>
+  </div>
+  
+  <footer>
+    <p>© 2025 Content Tool API Proxy | <a href="https://github.com/your-username/content-tool-proxy">GitHub Repository</a></p>
+  </footer>
+
+  <script>
+    // Simple status check
+    fetch('/api/status')
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 'active') {
+          console.log('API Proxy is active and working correctly');
+        }
+      })
+      .catch(error => {
+        console.error('API Proxy status check failed:', error);
+        document.querySelector('.status').className = 'status inactive';
+        document.querySelector('.status').textContent = 'Inactive';
+      });
+  </script>
 </body>
 </html>
